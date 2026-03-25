@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LiveChat</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#111b21;--sidebar:#111b21;--sidebar-hover:#202c33;--sidebar-active:#2a3942;
+  --chat-bg:#0b141a;--bubble-out:#005c4b;--bubble-in:#202c33;
+  --header:#202c33;--input-bg:#2a3942;--divider:#2a3942;
+  --text:#e9edef;--text2:#8696a0;--text3:#667781;
+  --green:#00a884;--green2:#00cf9d;--green-soft:rgba(0,168,132,0.15);
+  --red:#f15c6d;--teal:#53bdeb;
+  --font:'Segoe UI',-apple-system,BlinkMacSystemFont,sans-serif;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);height:100dvh;display:flex;flex-direction:column;overflow:hidden;}
+.screen{display:none;flex:1;flex-direction:column;}
+.screen.active{display:flex;}
+
+/* AUTH */
+#auth-screen{align-items:center;justify-content:center;background:var(--bg);padding:1.5rem;}
+.auth-box{background:var(--header);border-radius:16px;padding:2.5rem 2rem;width:100%;max-width:400px;display:flex;flex-direction:column;gap:1.25rem;}
+.auth-logo{display:flex;align-items:center;gap:0.75rem;justify-content:center;margin-bottom:0.25rem;}
+.auth-logo-text{font-size:1.6rem;font-weight:600;}
+.auth-subtitle{text-align:center;font-size:0.84rem;color:var(--text2);margin-top:-0.5rem;}
+.auth-tabs{display:flex;border-radius:8px;overflow:hidden;border:1px solid var(--divider);}
+.auth-tab{flex:1;padding:0.6rem;text-align:center;font-size:0.88rem;cursor:pointer;color:var(--text2);transition:all 0.2s;}
+.auth-tab.active{background:var(--green);color:#fff;font-weight:500;}
+.field{display:flex;flex-direction:column;gap:0.35rem;}
+.field label{font-size:0.78rem;color:var(--text2);}
+.field input{background:var(--input-bg);border:1px solid var(--divider);border-radius:8px;padding:0.7rem 1rem;color:var(--text);font-family:var(--font);font-size:0.92rem;outline:none;transition:border-color 0.2s;}
+.field input:focus{border-color:var(--green);}
+.field input::placeholder{color:var(--text3);}
+.auth-btn{background:var(--green);color:#fff;border:none;border-radius:8px;padding:0.8rem;font-family:var(--font);font-size:0.95rem;font-weight:500;cursor:pointer;transition:opacity 0.2s,transform 0.15s;width:100%;}
+.auth-btn:hover{opacity:0.88;transform:translateY(-1px);}
+.auth-btn:active{transform:translateY(0);}
+.auth-error{font-size:0.8rem;color:var(--red);text-align:center;min-height:1.1rem;}
+.terms-link{font-size:0.76rem;color:var(--text2);text-align:center;line-height:1.6;}
+.terms-link a{color:var(--green);cursor:pointer;text-decoration:underline;}
+
+/* TERMS */
+#terms-screen{background:var(--bg);overflow-y:auto;}
+.terms-header{background:var(--header);padding:1rem 1.25rem;display:flex;align-items:center;gap:0.75rem;position:sticky;top:0;z-index:10;border-bottom:1px solid var(--divider);}
+.back-btn{background:none;border:none;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:0.4rem;font-family:var(--font);font-size:0.9rem;padding:6px 10px;border-radius:8px;transition:color 0.2s,background 0.2s;}
+.back-btn:hover{color:var(--text);background:var(--sidebar-hover);}
+.terms-content{max-width:680px;margin:0 auto;padding:2rem 1.5rem 4rem;}
+.terms-content h1{font-size:1.5rem;font-weight:600;margin-bottom:0.3rem;}
+.terms-updated{font-size:0.8rem;color:var(--text3);margin-bottom:2rem;}
+.terms-content h2{font-size:0.95rem;font-weight:600;margin:1.75rem 0 0.5rem;color:var(--green);}
+.terms-content p{font-size:0.87rem;color:var(--text2);line-height:1.75;}
+
+/* APP LAYOUT */
+#app-screen{flex-direction:row;overflow:hidden;}
+#sidebar{width:380px;min-width:260px;display:flex;flex-direction:column;border-right:1px solid var(--divider);background:var(--sidebar);flex-shrink:0;}
+.sidebar-header{background:var(--header);padding:0.8rem 1rem;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.sidebar-header-left{display:flex;align-items:center;gap:0.75rem;}
+.my-avatar{width:40px;height:40px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:1.15rem;cursor:pointer;flex-shrink:0;user-select:none;}
+.sidebar-title{font-size:1.1rem;font-weight:600;}
+.icon-btn{background:none;border:none;color:var(--text2);cursor:pointer;padding:7px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background 0.2s,color 0.2s;}
+.icon-btn:hover{background:var(--sidebar-hover);color:var(--text);}
+.search-bar{padding:0.5rem 0.75rem;background:var(--sidebar);flex-shrink:0;}
+.search-input-wrap{background:var(--input-bg);border-radius:8px;display:flex;align-items:center;gap:0.5rem;padding:0.5rem 0.75rem;}
+.search-input-wrap input{background:none;border:none;color:var(--text);font-family:var(--font);font-size:0.87rem;outline:none;flex:1;}
+.search-input-wrap input::placeholder{color:var(--text3);}
+#chat-list-wrap{flex:1;overflow:hidden;display:flex;flex-direction:column;}
+#chat-list{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--divider) transparent;}
+.chat-item{display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;cursor:pointer;transition:background 0.13s;border-bottom:1px solid rgba(255,255,255,0.03);}
+.chat-item:hover{background:var(--sidebar-hover);}
+.chat-item.active{background:var(--sidebar-active);}
+.chat-avatar{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.35rem;flex-shrink:0;background:var(--input-bg);}
+.chat-avatar.group{background:#1f3a4f;font-size:1.2rem;}
+.chat-item-info{flex:1;min-width:0;}
+.chat-item-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.18rem;}
+.chat-item-name{font-size:0.92rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.chat-item-time{font-size:0.71rem;color:var(--text3);flex-shrink:0;margin-left:4px;}
+.chat-item-preview{font-size:0.8rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+/* USER SEARCH PANEL */
+#user-search-panel{display:none;flex-direction:column;position:absolute;top:0;left:0;width:380px;height:100%;background:var(--sidebar);z-index:20;border-right:1px solid var(--divider);}
+#user-search-panel.open{display:flex;}
+.search-panel-header{padding:0.75rem 1rem;background:var(--header);display:flex;align-items:center;gap:0.75rem;flex-shrink:0;border-bottom:1px solid var(--divider);}
+.search-panel-header input{background:var(--input-bg);border:1px solid var(--divider);border-radius:8px;padding:0.5rem 0.8rem;color:var(--text);font-family:var(--font);font-size:0.88rem;outline:none;flex:1;}
+.search-panel-header input:focus{border-color:var(--green);}
+#search-results{flex:1;overflow-y:auto;padding:0.5rem 0;}
+.search-result-item{display:flex;align-items:center;gap:0.8rem;padding:0.7rem 1rem;cursor:pointer;transition:background 0.13s;}
+.search-result-item:hover{background:var(--sidebar-hover);}
+.search-result-item .av{width:44px;height:44px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;}
+.search-result-item .s-name{font-size:0.9rem;font-weight:500;}
+.search-result-item .s-email{font-size:0.77rem;color:var(--text2);margin-top:2px;}
+.search-hint{padding:2rem 1rem;text-align:center;font-size:0.84rem;color:var(--text3);}
+
+/* CHAT PANEL */
+#chat-panel{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--chat-bg);}
+#no-chat{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;}
+#no-chat svg{opacity:0.15;}
+#no-chat p{font-size:1rem;font-weight:500;color:var(--text2);}
+#no-chat span{font-size:0.82rem;color:var(--text3);}
+#active-chat{flex:1;display:none;flex-direction:column;overflow:hidden;}
+.chat-header{background:var(--header);padding:0.65rem 1rem;display:flex;align-items:center;gap:0.75rem;flex-shrink:0;border-bottom:1px solid var(--divider);}
+.chat-header-avatar{width:40px;height:40px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;}
+.chat-header-avatar.group{background:#1f3a4f;color:var(--teal);}
+.chat-header-info{flex:1;}
+.chat-header-name{font-size:0.95rem;font-weight:500;}
+.chat-header-sub{font-size:0.75rem;color:var(--text2);}
+#messages-wrap{flex:1;overflow-y:auto;padding:0.75rem 5%;display:flex;flex-direction:column;gap:0.15rem;scrollbar-width:thin;scrollbar-color:var(--divider) transparent;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Ccircle cx='200' cy='200' r='160' stroke='%2300a884' stroke-opacity='0.025' stroke-width='1' fill='none'/%3E%3C/svg%3E");}
+.date-div{align-self:center;background:var(--header);color:var(--text2);font-size:0.72rem;padding:4px 14px;border-radius:8px;margin:0.6rem 0;user-select:none;}
+.msg-row{display:flex;flex-direction:column;max-width:62%;}
+.msg-row.out{align-self:flex-end;align-items:flex-end;}
+.msg-row.in{align-self:flex-start;align-items:flex-start;}
+.msg-sender-label{font-size:0.72rem;color:var(--teal);font-weight:500;padding:0 5px;margin-bottom:2px;}
+.bubble{padding:0.48rem 0.75rem 0.28rem;border-radius:8px;font-size:0.875rem;line-height:1.5;word-break:break-word;}
+.bubble.out{background:var(--bubble-out);border-radius:8px 0 8px 8px;}
+.bubble.in{background:var(--bubble-in);border-radius:0 8px 8px 8px;}
+.bubble-footer{display:flex;justify-content:flex-end;align-items:center;gap:4px;margin-top:2px;}
+.bubble-time{font-size:0.67rem;color:rgba(255,255,255,0.4);}
+.sys-msg{align-self:center;background:rgba(11,20,26,0.85);color:var(--text2);font-size:0.74rem;padding:4px 14px;border-radius:8px;margin:0.4rem 0;border:1px solid var(--divider);}
+#input-area{background:var(--header);padding:0.6rem 1rem;display:flex;align-items:flex-end;gap:0.75rem;flex-shrink:0;}
+#msg-input{flex:1;background:var(--input-bg);border:none;border-radius:10px;padding:0.68rem 1rem;color:var(--text);font-family:var(--font);font-size:0.92rem;outline:none;resize:none;max-height:120px;scrollbar-width:none;line-height:1.4;}
+#msg-input::placeholder{color:var(--text3);}
+.send-btn{width:44px;height:44px;border-radius:50%;background:var(--green);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background 0.2s,transform 0.15s;}
+.send-btn:hover{background:var(--green2);}
+.send-btn:active{transform:scale(0.92);}
+
+/* LOADING */
+#loading-screen{align-items:center;justify-content:center;gap:1rem;}
+.spinner{width:36px;height:36px;border:3px solid var(--divider);border-top-color:var(--green);border-radius:50%;animation:spin 0.7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* MOBILE */
+@media(max-width:640px){
+  #app-screen{position:relative;}
+  #sidebar{width:100%;position:absolute;top:0;left:0;height:100%;z-index:5;}
+  #chat-panel{width:100%;position:absolute;top:0;left:0;height:100%;z-index:6;display:none;}
+  #app-screen.chat-open #chat-panel{display:flex;}
+  #user-search-panel{width:100%;}
+}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading-screen" class="screen active">
+  <div class="spinner"></div>
+  <span style="font-size:0.85rem;color:var(--text2);">Connecting…</span>
+</div>
+
+<!-- AUTH -->
+<div id="auth-screen" class="screen">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <svg width="44" height="44" viewBox="0 0 55 55" fill="none"><circle cx="27.5" cy="27.5" r="27.5" fill="#00a884"/><path d="M27.5 12C19 12 12 19 12 27.5c0 3.1.9 6 2.4 8.4L12 43l7.4-2.4C21.6 42 24.5 43 27.5 43c8.5 0 15.5-7 15.5-15.5S36 12 27.5 12zm7.6 21.1c-.3.9-1.8 1.7-2.5 1.8-.6.1-1.4.1-2.2-.1-.5-.1-1.2-.3-2-.7-3.5-1.5-5.8-5.1-6-5.3-.2-.2-1.4-1.9-1.4-3.6 0-1.7.9-2.6 1.2-2.9.3-.3.7-.4 1-.4h.7c.2 0 .5 0 .7.6.3.7 1 2.5 1 2.7.1.2.1.4 0 .6-.1.2-.2.4-.3.5l-.5.5c-.2.2-.4.4-.2.7.2.4.9 1.4 1.9 2.3 1.3 1.1 2.4 1.5 2.7 1.6.3.2.5.1.7-.1.2-.2.8-.9 1-1.3.2-.3.5-.3.8-.2.3.1 2 .9 2.4 1.1.4.2.6.3.7.5.1.4-.1 1.6-.4 2.5z" fill="white"/></svg>
+      <span class="auth-logo-text">LiveChat</span>
+    </div>
+    <p class="auth-subtitle">Simple, fast, private messaging</p>
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tab-login" onclick="switchTab('login')">Log in</div>
+      <div class="auth-tab" id="tab-signup" onclick="switchTab('signup')">Sign up</div>
+    </div>
+    <div id="login-form" style="display:flex;flex-direction:column;gap:1rem;">
+      <div class="field"><label>Email</label><input type="email" id="login-email" placeholder="you@email.com"/></div>
+      <div class="field"><label>Password</label><input type="password" id="login-pass" placeholder="••••••••"/></div>
+      <div class="auth-error" id="login-err"></div>
+      <button class="auth-btn" onclick="doLogin()">Log in</button>
+    </div>
+    <div id="signup-form" style="display:none;flex-direction:column;gap:1rem;">
+      <div class="field"><label>Display name</label><input type="text" id="signup-name" placeholder="Your name" maxlength="30"/></div>
+      <div class="field"><label>Email</label><input type="email" id="signup-email" placeholder="you@email.com"/></div>
+      <div class="field"><label>Password</label><input type="password" id="signup-pass" placeholder="At least 6 characters"/></div>
+      <div class="auth-error" id="signup-err"></div>
+      <button class="auth-btn" onclick="doSignup()">Create account</button>
+      <p class="terms-link">By signing up you agree to our <a onclick="showTerms()">Terms &amp; Conditions</a></p>
+    </div>
+  </div>
+</div>
+
+<!-- TERMS -->
+<div id="terms-screen" class="screen">
+  <div class="terms-header">
+    <button class="back-btn" onclick="hideTerms()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      Back
+    </button>
+    <span style="font-weight:500;font-size:0.95rem;">Terms &amp; Conditions</span>
+  </div>
+  <div class="terms-content">
+    <h1>Terms &amp; Conditions</h1>
+    <p class="terms-updated">Last updated: March 2026</p>
+    <p>Welcome to LiveChat. By creating an account and using this app, you agree to the following terms. Please read them carefully before signing up.</p>
+    <h2>1. Acceptance of Terms</h2>
+    <p>By accessing or using LiveChat, you agree to be bound by these Terms & Conditions. If you do not agree with any part of these terms, please do not use the app.</p>
+    <h2>2. Eligibility</h2>
+    <p>You must be at least 13 years old to use LiveChat. By creating an account, you confirm that you meet this age requirement.</p>
+    <h2>3. Your Account</h2>
+    <p>You are responsible for maintaining the confidentiality of your account credentials. Do not share your password with anyone. You are solely responsible for all activity that occurs under your account. If you believe your account has been compromised, change your password immediately.</p>
+    <h2>4. Acceptable Use</h2>
+    <p>You agree not to use LiveChat to send spam, harass, bully, threaten, or harm other users. You must not send illegal content, impersonate other users, or attempt to gain unauthorised access to any part of the system. Violation of these rules may result in your account being suspended or deleted.</p>
+    <h2>5. Privacy &amp; Data</h2>
+    <p>Your display name and email address are stored in Firebase to enable messaging features. Passwords are securely hashed by Firebase Authentication and are never readable by the app owner or anyone else. Messages are stored in Firebase Realtime Database. This app does not use end-to-end encryption.</p>
+    <h2>6. Data Retention</h2>
+    <p>Messages may be stored indefinitely. You may request deletion of your account at any time. Upon deletion, your profile data will be removed, though messages you sent in group rooms may remain visible to others.</p>
+    <h2>7. Changes to Terms</h2>
+    <p>These terms may be updated from time to time. Continued use of LiveChat after any changes constitutes your acceptance of the revised terms.</p>
+    <h2>8. Limitation of Liability</h2>
+    <p>LiveChat is provided "as is" without warranties of any kind. We are not responsible for any damages, data loss, or issues arising from your use of the app.</p>
+    <h2>9. Contact</h2>
+    <p>If you have questions about these terms, please reach out via the GitHub repository associated with this project.</p>
+    <div style="margin-top:2.5rem;">
+      <button class="auth-btn" onclick="hideTerms()">Got it, go back</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app-screen" class="screen">
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-header-left">
+        <div class="my-avatar" id="my-avatar-el">😊</div>
+        <span class="sidebar-title">LiveChat</span>
+      </div>
+      <div style="display:flex;gap:2px;">
+        <button class="icon-btn" title="New direct message" onclick="openSearch()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><line x1="12" y1="8" x2="12" y2="12"></line><line x1="10" y1="10" x2="14" y2="10"></line></svg>
+        </button>
+        <button class="icon-btn" title="Sign out" onclick="doSignout()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+        </button>
+      </div>
+    </div>
+    <div class="search-bar">
+      <div class="search-input-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" placeholder="Search or start new chat" id="chat-search" oninput="filterChats(this.value)"/>
+      </div>
+    </div>
+    <div id="chat-list-wrap">
+      <div id="chat-list"></div>
+    </div>
+    <!-- User search overlay -->
+    <div id="user-search-panel">
+      <div class="search-panel-header">
+        <button class="icon-btn" onclick="closeSearch()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        </button>
+        <input type="text" id="user-search-input" placeholder="Search by name…" oninput="searchUsers(this.value)"/>
+      </div>
+      <div id="search-results"><p class="search-hint">Type a name to find users</p></div>
+    </div>
+  </div>
+
+  <div id="chat-panel">
+    <div id="no-chat">
+      <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+      <p>Select a chat to start messaging</p>
+      <span>Or tap the icon above to find someone</span>
+    </div>
+    <div id="active-chat">
+      <div class="chat-header">
+        <button class="icon-btn" id="mobile-back-btn" style="display:none;" onclick="mobileBack()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        </button>
+        <div class="chat-header-avatar" id="chat-hdr-avatar">😊</div>
+        <div class="chat-header-info">
+          <div class="chat-header-name" id="chat-hdr-name">Chat</div>
+          <div class="chat-header-sub" id="chat-hdr-sub"></div>
+        </div>
+      </div>
+      <div id="messages-wrap"></div>
+      <div id="input-area">
+        <textarea id="msg-input" rows="1" placeholder="Type a message"></textarea>
+        <button class="send-btn" onclick="sendMessage()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const AVATARS=['😊','😎','🤩','🥳','🐱','🐶','🦊','🐸','🦁','🐧','🦋','🌟'];
+const firebaseConfig={
+  apiKey:"AIzaSyDeU_6aTV2L4gglO9h7mBDG3PcanMjN1zo",
+  authDomain:"new-chat-app-55e22.firebaseapp.com",
+  databaseURL:"https://new-chat-app-55e22-default-rtdb.firebaseio.com",
+  projectId:"new-chat-app-55e22",
+  storageBucket:"new-chat-app-55e22.firebasestorage.app",
+  messagingSenderId:"1051679209922",
+  appId:"1:1051679209922:web:e849e53c67dc657e9bfe5b"
+};
+firebase.initializeApp(firebaseConfig);
+const auth=firebase.auth();
+const db=firebase.database();
+
+let me=null, currentChatId=null, currentChatType=null, msgOff=null;
+let lastDateLabel='', lastUid='';
+
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
+
+// ── AUTH STATE ──
+auth.onAuthStateChanged(async user=>{
+  if(user){
+    me=user;
+    await ensureProfile();
+    loadApp();
+  } else {
+    show('auth-screen');
+  }
+});
+
+async function ensureProfile(){
+  const snap=await db.ref('users/'+me.uid).get();
+  if(!snap.exists()){
+    const av=AVATARS[Math.floor(Math.random()*AVATARS.length)];
+    await db.ref('users/'+me.uid).set({name:me.displayName||'User',email:me.email,avatar:av,uid:me.uid,joined:Date.now()});
+  }
+}
+
+// ── TABS ──
+function switchTab(t){
+  document.getElementById('tab-login').classList.toggle('active',t==='login');
+  document.getElementById('tab-signup').classList.toggle('active',t==='signup');
+  document.getElementById('login-form').style.display=t==='login'?'flex':'none';
+  document.getElementById('signup-form').style.display=t==='signup'?'flex':'none';
+}
+
+// ── TERMS ──
+let termsFrom='auth-screen';
+function showTerms(){termsFrom=document.querySelector('.screen.active').id;show('terms-screen');}
+function hideTerms(){show(termsFrom);}
+
+// ── LOGIN ──
+async function doLogin(){
+  const email=document.getElementById('login-email').value.trim();
+  const pass=document.getElementById('login-pass').value;
+  document.getElementById('login-err').textContent='';
+  if(!email||!pass){document.getElementById('login-err').textContent='Please fill in all fields.';return;}
+  try{await auth.signInWithEmailAndPassword(email,pass);}
+  catch(e){document.getElementById('login-err').textContent=fErr(e.code);}
+}
+
+// ── SIGNUP ──
+async function doSignup(){
+  const name=document.getElementById('signup-name').value.trim();
+  const email=document.getElementById('signup-email').value.trim();
+  const pass=document.getElementById('signup-pass').value;
+  document.getElementById('signup-err').textContent='';
+  if(!name||!email||!pass){document.getElementById('signup-err').textContent='Please fill in all fields.';return;}
+  if(pass.length<6){document.getElementById('signup-err').textContent='Password must be at least 6 characters.';return;}
+  try{
+    const cred=await auth.createUserWithEmailAndPassword(email,pass);
+    const av=AVATARS[Math.floor(Math.random()*AVATARS.length)];
+    await db.ref('users/'+cred.user.uid).set({name,email,avatar:av,uid:cred.user.uid,joined:Date.now()});
+  } catch(e){document.getElementById('signup-err').textContent=fErr(e.code);}
+}
+
+function fErr(c){
+  return({'auth/user-not-found':'No account found with that email.','auth/wrong-password':'Incorrect password.','auth/email-already-in-use':'That email is already registered.','auth/invalid-email':'Please enter a valid email.','auth/weak-password':'Password is too weak.','auth/too-many-requests':'Too many attempts. Try again later.','auth/invalid-credential':'Incorrect email or password.'})[c]||'Something went wrong.';
+}
+
+async function doSignout(){await auth.signOut();location.reload();}
+
+// ── LOAD APP ──
+async function loadApp(){
+  show('loading-screen');
+  const snap=await db.ref('users/'+me.uid).get();
+  const profile=snap.val();
+  document.getElementById('my-avatar-el').textContent=profile.avatar||'😊';
+  document.getElementById('my-avatar-el').title=profile.name;
+  show('app-screen');
+  buildChatList();
+  setupEnter();
+}
+
+// ── CHAT LIST ──
+function buildChatList(){
+  const list=document.getElementById('chat-list');
+  list.innerHTML='';
+  // Global group
+  addChatItem(list,'group','global','🌐','Global Chat',true);
+  // DMs
+  db.ref('dms').on('value',snap=>{
+    list.querySelectorAll('.dm-item').forEach(e=>e.remove());
+    const dms=snap.val()||{};
+    Object.entries(dms).forEach(([cid,data])=>{
+      const mems=Object.keys(data.members||{});
+      if(!mems.includes(me.uid)) return;
+      const otherId=mems.find(id=>id!==me.uid);
+      if(!otherId) return;
+      db.ref('users/'+otherId).get().then(us=>{
+        if(!us.exists()) return;
+        const u=us.val();
+        if(list.querySelector(`[data-cid="${cid}"]`)) return;
+        const item=addChatItem(list,'dm',cid,u.avatar||'😊',u.name,false);
+        item.classList.add('dm-item');
+      });
+    });
+  });
+}
+
+function addChatItem(list,type,cid,avatar,name,isGroup){
+  const el=document.createElement('div');
+  el.className='chat-item';
+  el.dataset.cid=cid;
+  el.innerHTML=`
+    <div class="chat-avatar${isGroup?' group':''}">${avatar}</div>
+    <div class="chat-item-info">
+      <div class="chat-item-top">
+        <span class="chat-item-name">${esc(name)}</span>
+        <span class="chat-item-time" id="ct-${cid}"></span>
+      </div>
+      <div class="chat-item-preview" id="cp-${cid}">No messages yet</div>
+    </div>`;
+  el.onclick=()=>openChat(type,cid,name,avatar,isGroup);
+  // Live last message
+  const ref=type==='group'?db.ref('rooms/global/messages'):db.ref(`dms/${cid}/messages`);
+  ref.limitToLast(1).on('value',s=>{
+    const msgs=s.val();
+    if(msgs){
+      const last=Object.values(msgs)[0];
+      const p=document.getElementById('cp-'+cid);
+      const t=document.getElementById('ct-'+cid);
+      if(p) p.textContent=(last.uid===me.uid?'You: ':last.name+': ')+last.text;
+      if(t) t.textContent=fTime(last.ts);
+    }
+  });
+  list.appendChild(el);
+  return el;
+}
+
+// ── OPEN CHAT ──
+function openChat(type,cid,name,avatar,isGroup){
+  if(msgOff){msgOff();msgOff=null;}
+  currentChatId=cid; currentChatType=type;
+  document.querySelectorAll('.chat-item').forEach(i=>i.classList.remove('active'));
+  const item=document.querySelector(`[data-cid="${cid}"]`);
+  if(item) item.classList.add('active');
+
+  document.getElementById('no-chat').style.display='none';
+  const ac=document.getElementById('active-chat');
+  ac.style.display='flex'; ac.style.flexDirection='column';
+
+  const ha=document.getElementById('chat-hdr-avatar');
+  ha.textContent=avatar;
+  ha.className='chat-header-avatar'+(isGroup?' group':'');
+  document.getElementById('chat-hdr-name').textContent=name;
+  document.getElementById('chat-hdr-sub').textContent=isGroup?'Group · tap to add people':'';
+
+  if(window.innerWidth<=640){
+    document.getElementById('app-screen').classList.add('chat-open');
+    document.getElementById('mobile-back-btn').style.display='flex';
+  }
+
+  const wrap=document.getElementById('messages-wrap');
+  wrap.innerHTML='';
+  lastDateLabel=''; lastUid='';
+
+  const ref=type==='group'?db.ref('rooms/global/messages'):db.ref(`dms/${cid}/messages`);
+  msgOff=ref.limitToLast(100).on('child_added',snap=>{
+    renderMsg(snap.val(),wrap,isGroup);
+    wrap.scrollTop=wrap.scrollHeight;
+  });
+}
+
+function mobileBack(){
+  document.getElementById('app-screen').classList.remove('chat-open');
+  document.getElementById('active-chat').style.display='none';
+  document.getElementById('no-chat').style.display='flex';
+  document.getElementById('mobile-back-btn').style.display='none';
+  if(msgOff){msgOff();msgOff=null;}
+  currentChatId=null;
+}
+
+// ── SEND ──
+async function sendMessage(){
+  const input=document.getElementById('msg-input');
+  const text=input.value.trim();
+  if(!text||!currentChatId) return;
+  input.value=''; input.style.height='auto';
+  const snap=await db.ref('users/'+me.uid).get();
+  const profile=snap.val();
+  const msg={uid:me.uid,name:profile.name,avatar:profile.avatar||'😊',text,ts:Date.now()};
+  if(currentChatType==='group') db.ref('rooms/global/messages').push(msg);
+  else db.ref(`dms/${currentChatId}/messages`).push(msg);
+}
+
+// ── RENDER MESSAGE ──
+function renderMsg(msg,wrap,isGroup){
+  const isMe=msg.uid===me.uid;
+  const dateStr=new Date(msg.ts).toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'});
+  if(dateStr!==lastDateLabel){
+    const d=document.createElement('div');
+    d.className='date-div'; d.textContent=dateStr;
+    wrap.appendChild(d);
+    lastDateLabel=dateStr; lastUid='';
+  }
+  const showSender=isGroup&&!isMe&&msg.uid!==lastUid;
+  lastUid=msg.uid;
+  const row=document.createElement('div');
+  row.className='msg-row '+(isMe?'out':'in');
+  row.innerHTML=`
+    ${showSender?`<div class="msg-sender-label">${esc(msg.name)}</div>`:''}
+    <div class="bubble ${isMe?'out':'in'}">
+      ${esc(msg.text)}
+      <div class="bubble-footer"><span class="bubble-time">${fTime(msg.ts)}</span></div>
+    </div>`;
+  wrap.appendChild(row);
+}
+
+// ── USER SEARCH ──
+function openSearch(){document.getElementById('user-search-panel').classList.add('open');setTimeout(()=>document.getElementById('user-search-input').focus(),50);}
+function closeSearch(){document.getElementById('user-search-panel').classList.remove('open');document.getElementById('user-search-input').value='';document.getElementById('search-results').innerHTML='<p class="search-hint">Type a name to find users</p>';}
+
+async function searchUsers(q){
+  const res=document.getElementById('search-results');
+  if(!q.trim()){res.innerHTML='<p class="search-hint">Type a name to find users</p>';return;}
+  res.innerHTML='<p class="search-hint">Searching…</p>';
+  const snap=await db.ref('users').get();
+  const users=snap.val()||{};
+  const hits=Object.values(users).filter(u=>u.uid!==me.uid&&u.name.toLowerCase().includes(q.toLowerCase()));
+  if(!hits.length){res.innerHTML='<p class="search-hint">No users found</p>';return;}
+  res.innerHTML=hits.map(u=>`
+    <div class="search-result-item" onclick="startDM('${u.uid}','${esc(u.name)}','${u.avatar||'😊'}')">
+      <div class="av">${u.avatar||'😊'}</div>
+      <div><div class="s-name">${esc(u.name)}</div><div class="s-email">${esc(u.email||'')}</div></div>
+    </div>`).join('');
+}
+
+async function startDM(uid,name,avatar){
+  const snap=await db.ref('dms').get();
+  const dms=snap.val()||{};
+  let cid=null;
+  for(const [id,data] of Object.entries(dms)){
+    const mems=Object.keys(data.members||{});
+    if(mems.includes(me.uid)&&mems.includes(uid)){cid=id;break;}
+  }
+  if(!cid){
+    const ref=db.ref('dms').push();
+    cid=ref.key;
+    await ref.set({members:{[me.uid]:true,[uid]:true},created:Date.now()});
+  }
+  closeSearch();
+  openChat('dm',cid,name,avatar,false);
+}
+
+// ── FILTER ──
+function filterChats(q){
+  document.querySelectorAll('.chat-item').forEach(el=>{
+    const n=el.querySelector('.chat-item-name').textContent.toLowerCase();
+    el.style.display=n.includes(q.toLowerCase())?'':'none';
+  });
+}
+
+// ── ENTER KEY ──
+function setupEnter(){
+  const input=document.getElementById('msg-input');
+  input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}});
+  input.addEventListener('input',function(){this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px';});
+}
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Enter') return;
+  const lf=document.getElementById('login-form');
+  const sf=document.getElementById('signup-form');
+  if(lf&&lf.style.display!=='none'&&document.activeElement&&lf.contains(document.activeElement)) doLogin();
+  else if(sf&&sf.style.display!=='none'&&document.activeElement&&sf.contains(document.activeElement)) doSignup();
+});
+
+// ── HELPERS ──
+function fTime(ts){return new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+</script>
+</body>
+</html>
